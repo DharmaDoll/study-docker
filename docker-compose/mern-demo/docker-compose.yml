@@ -1,0 +1,38 @@
+version: "3"
+services:
+  react-app:
+    image: react-app
+    stdin_open: true
+    ports: 
+      - "3000:3000" #127.0.0.1:付けないと全公開になる。意図してる場合は良い
+    networks:
+      - mern-app
+  api-server:
+    image: api-server
+    ports:
+      - "5000:5000" #127.0.0.1:付けないと全公開になる。意図してる場合は良い
+    networks:
+      - mern-app
+    depends_on:
+      - mongo
+  mongo:
+    image: mongo:3.6.19-xenial
+    ports:
+      - "27017:27017" #127.0.0.1:付けないと全公開になる。意図してる場合は良い
+    networks:
+      - mern-app
+    volumes:
+      - mongo-data:/data/db
+networks:
+  mern-app:
+    driver: bridge
+volumes:
+  mongo-data:
+    driver: local #Check the storage location, run to `docker volume ls && docker inspect {dir}_mongo-data`
+    #`docker-compose down -v` するとボリュームも削除されるので注意
+    #Docker for Macの場合は「存在しない」とエラーになります。これはmacOS上でDockerを動作させてvolumeを作成しているのではなく、
+    #Dockerが自動的にLinuxKitと呼ばれるVMを立ち上げてその中にVolumeを作成しているからです。
+    #https://qiita.com/ysd_marrrr/items/e8a50c43cff87951385c
+    #screen ~/Library/Containers/com.docker.docker/Data/vms/0/tty　で ctr+d するとlogin状態になり、pathにアクセスできる
+     
+

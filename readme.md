@@ -1,6 +1,10 @@
-- [MERN Docker Compose DEMO www](#mern-docker-compose-demo-www)
-- [基本 build\&run](#基本-buildrun)
+- [Let's keep learning](#lets-keep-learning)
+- [Cheet sheet](#cheet-sheet)
   - [-d はデタッチでコンテナをバックグランドで動かすイメージ。これ理解してないとハマる。](#-d-はデタッチでコンテナをバックグランドで動かすイメージこれ理解してないとハマる)
+- [Practical Docker images usage](#practical-docker-images-usage)
+- [Docker storage Concepts](#docker-storage-concepts)
+  - [--volume (-v)](#--volume--v)
+    - [DockerfileのVOLUME](#dockerfileのvolume)
 - [DockerfileのCMDとENTRYPOINT](#dockerfileのcmdとentrypoint)
   - [ENTRYPOINTの有無でCMDの役割が変わる（分かりやすい例）](#entrypointの有無でcmdの役割が変わる分かりやすい例)
   - [ベストプラクティスとしては…](#ベストプラクティスとしては)
@@ -8,29 +12,112 @@
 - [Docker上でcronを動かす時のDockerfile sample](#docker上でcronを動かす時のdockerfile-sample)
 - [Docker-compose](#docker-compose)
   - [Syntax](#syntax)
+- [Docker network](#docker-network)
+- [マルチステージビルド](#マルチステージビルド)
 
 
 
-## MERN Docker Compose DEMO www
- Mongodb, Express.js, React, Node.js シンプルで良い。 Dockerizeの参考に。
-- https://github.com/usagihitsuji/shellscripts/blob/master/Dockerfiles/mern-docker-compose/
-- https://github.com/sidpalas/mern-docker-compose
- 
-## 基本 build&run
+## Let's keep learning
+ - https://qiita.com/Gucchiy/items/16045193baabf3dfa176
+ - Best practice:  https://qiita.com/Tsuyozo/items/c706a04848c3fbbaf055
+ - sample collection: https://github.com/sidpalas/devops-directive
+   - https://github.com/zerofox-oss/phishpond/blob/master/docker-compose.yml
+ - コンテナの名前：https://deeeet.com/writing/2014/07/15/docker-container-name/
+ - Understanding Docker image: https://qiita.com/zembutsu/items/24558f9d0d254e33088f?
+ - [Why do we need MySQL Docker image](https://qiita.com/Gucchiy/items/679b95715592bb4bb4de#%E3%81%AA%E3%81%9C-mysql-docker-%E3%82%A4%E3%83%A1%E3%83%BC%E3%82%B8%E3%81%8C%E5%BF%85%E8%A6%81%E3%81%A7%E3%81%A9%E3%81%AE%E3%82%88%E3%81%86%E3%81%AB%E3%82%B3%E3%83%B3%E3%83%86%E3%83%8A%E3%83%BC%E3%81%A8%E3%81%97%E3%81%A6%E8%B5%B7%E5%8B%95%E5%AE%9F%E8%A1%8C%E3%81%99%E3%82%8B%E3%81%AE%E3%81%8B)
+
+## Cheet sheet
 ```bash
+# Build
 docker build --no-cache=true -t IMAGE_NAME .
-
-# これで動かす。
+# Run
 docker run -d --name CONTAINER_ID IMAGE_NAME
 
 #ホストの12345で待ち受けて22に転送、ホストのexportフォルダをコンテナのtmpフォルダに公開。
 # Docker for macの場合、ホスト側のdirはの設定で追加しとく必要がある
-docker run -it --rm --name {name} -p 12345:22 -v /usr/export:/コンテナのdir/tmp {IMAGE_NAME testtag} bin/bash
+docker run -it --rm --name {name} -p 12345:22 -v /usr/export:/コンテナのdir/tmp {IMAGE_NAME}:{tag name} bin/bash
+
+#コンテナの80を127.0.0.1上の80にバインド
+#--cap-add=NET_ADMIN はiptables利用するときに必要
+#--restart=always で自動でOSの起動時にコンテナを起動させる
+docker container run --rm --cap-add=NET_ADMIN -d -p 127.0.0.1:80:80 dockersamples/static-site
+
+# Shell login
+docker exec -it 5c0e4a159737 /bin/bash
+#-it の意味。i -> intractive, t -> tty　だっけ bashにログインしたい場合は-itにしないとダメ。
+#標準入力だけとかにしたいい場合は、-itだとエラーとなるケースもあるので注意 -> cronとかで外からコマンド叩かせるケース。
+# 40 13 * * * /usr/bin/docker exec -i namae /bin/bash -c '/root/report.sh >>/root/cron.log 2>&1
+
+
+#tag無しイメージ削除
+docker rmi `docker images -f "dangling=true" -q`
+#停止コンテナ削除 注意
+docker rm `docker ps -f "status=exited" -q`
+docker container prune
+#未使用イメージ全削除 注意
+docker image prune
+#停止コンテナ、タグ無しイメージ、未使用ボリューム、未使用ネットワーク一括削除
+docker system prune
+#起動コンテンのnetwork確認
+docker network inspect bridge | jq '.[0].Containers'
+
 ```
 ### -d はデタッチでコンテナをバックグランドで動かすイメージ。これ理解してないとハマる。
-*
-*Docker Container上ではProcessがForegroundで動いていないとContainerは終了する』というContainerの制限がある中で、** 1つのContainer上で複数のプロセス (例えばNode + MongoやFluentd + Elasticsearchなど)を動かしたい、永続化させたい時にSupervisorというToolが使われます。
+**Docker Container上ではProcessがForegroundで動いていないとContainerは終了する』というContainerの制限がある中で**、1つのContainer上で複数のプロセス (例えばNode + MongoやFluentd + Elasticsearchなど)を動かしたい、永続化させたい時にSupervisorというToolが使われます。
 
+## Practical Docker images usage
+![dddd](https://gyazo.com/1f7d36bf3d983a5fe230dc982c809f74.png)
+1. ポート設定:
+　通信に用いるポート番号です。docker runする際に、-pオプションを使ってポートの結び付けを指定します。
+
+2. 永続化すべきディレクトリ:
+　コンテナ内部のディレクトリのうち、マウントを必要とするディレクトリです。例えば「コンテンツを保存するディレクトリ」「データベースを保存するディレクトリ」などは、docker runする際に、-vオプションでそのディレクトリをマウントし、コンテナが破棄されても消えないようにします。
+
+3. 設定情報:
+　ほとんどのDockerイメージは、環境変数などを使って各種設定をします。docker runする際に、-eオプションで指定します。--env-fileとかのほうが良い
+
+
+## Docker storage Concepts
+コンテナ内で発生したデータは同じコンテナ内のどこかに書き出されるが、コンテナを破棄すると消えてしまいます。データだけはコンテナが消えても保存しておきたかったり、別コンテナで使いたいというニーズに対して、Docker はコンテナ外にデータ保存領域をつくる機能を提供しています。 Ref from:https://qiita.com/aki_55p/items/63c47214cab7bcb027e0
+
+具体的には3種類。（厳密にいうと、Windows で名前付きパイプっていうのもある）
+- ボリューム
+  - Docker の管理下でストレージ領域を確保する。Linux なら `/var/lib/docker/volumes/`以下。
+  名前付きボリュームと匿名ボリュームがあり、名前付きの場合は Docker ホスト内で名前解決できるのでアクセスしやすい。匿名ボリュームは適当にハッシュ値が振られる。
+  **他のプロセスからはさわれないので安全。基本はこれを使うのがよい。名前付きの方を**
+  	https://github.com/DharmaDoll/Search-Poc-from-CVE#as-needed-you-can-see-database
+- バインドマウント
+ 	- ホスト側のディレクトリをコンテナ内のディレクトリと共有する。
+ 	ホスト側の環境に依存しますし、ボリュームに比べて機能が制限されています。ホスト側からデータを注入したいときや、開発時に更新したソースコードやビルドを即時反映したい場合などの場合はバインドマウントを使うのがよいです。
+- tmpfs
+ 	- メモリ上にストレージ領域を確保する。名前の通り一時的な領域となる。用途としては、機密性の高い情報を一時的にマウントする場合などに使う。
+
+-vオプションも、VOLUMEやvolumesで指定するものに関しても、基本的には上記のどれかを扱っています。普通に使う分にはボリュームかバインドマウントになる。
+
+
+### --volume (-v)
+-vオプションでいろいろ指定ができるのが混乱の原因。上記3種類のストレージが理解できていればなんてことないのですが。
+`sample/image:latest` というイメージを run するとして、以下に記法による違いを列挙します。
+ - 匿名ボリューム
+   - `$ docker container run -v /hoge sample/image:latest` 
+   - ホスト側には、Linux なら/var/lib/docker/volumes/以下に領域が確保され、コンテナ内の/hogeディレクトリと共有される。識別のためにハッシュ値が振られる。同じネットワークからそのハッシュ値でアクセスできる。
+- 名前付きボリューム おすすめ
+  - `$ docker container run -v name:/hoge sample/image:latest`
+  - 匿名ボリュームと同様に、ホスト側には、Linux なら/var/lib/docker/volumes/以下に領域が確保され、コンテナ内の/hogeディレクトリと共有される。nameという名前がついているので、同じネットワーク内から name というホスト名でアクセスできる。
+   - --rmオプションをつけると、匿名ボリュームの場合はコンテナ停止と同時にボリュームも破棄されます。
+     - 名前付きボリュームの場合は--rmオプションでコンテナが破棄されても破棄されません。
+     - ただ名前付きボリュームであっても、マウントされたコンテナがない状態では、`$ docker volume prune` などでは破棄されます。
+ - バインドマウント
+   - `$ docker container run -v ${PWD}/data:/hoge sample/image:latest`
+   - ホスト側のカレントディレクトリ配下のdataディレクトリと、コンテナ側の/hogeディレクトリが共有される。
+   - `$docker run -it --rm --name {testcontainername} -v /usr/export:{/コンテナのdir/tmp} {image name} bin/bash`
+   - ホストのexportフォルダをコンテナのtmpフォルダに公開(-v)。
+  	 （ホスト側のdirはDocker for macのPreference設定で追加しとく必要がある）
+   	 https://qiita.com/Gucchiy/items/18d2ea155084419727c6
+
+#### DockerfileのVOLUME
+https://genzouw.com/entry/2020/02/08/225825/1921/  
+    Dockerfile の VOLUME 命令に指定されたパスは docker run --volumes-from でマウントできる ?
 
 
 ## [DockerfileのCMDとENTRYPOINT](https://qiita.com/uehaj/items/e6dd013e28593c26372d#%E3%82%B3%E3%83%B3%E3%83%86%E3%83%8A%E3%81%AE%E5%AE%9F%E8%A1%8C%E3%81%A8%E8%B5%B7%E5%8B%95%E3%83%97%E3%83%AD%E3%82%BB%E3%82%B9%E3%81%AE%E6%8C%87%E5%AE%9A)
@@ -185,3 +272,11 @@ Docker Composeのdocker-compose.ymlファイルでは`entrypoint`はentrypoint�
 - http://docs.docker.jp/compose/compose-file.html#command
 
 
+## Docker network
+ https://tech-lab.sios.jp/archives/20179
+
+## マルチステージビルド
+別のイメージのビルド時の成果物を一つのdockerfile内でコピーできる
+ - https://qiita.com/carimatics/items/01663d32bf9983cfbcfe
+ - https://future-architect.github.io/articles/20200513/
+ - 小技集: https://qiita.com/schrosis/items/6f0839439dac493ef9e3
