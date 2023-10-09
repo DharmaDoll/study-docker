@@ -80,6 +80,10 @@ docker network inspect bridge | jq '.[0].Containers'
 ## Docker storage Concepts
 コンテナ内で発生したデータは同じコンテナ内のどこかに書き出されるが、コンテナを破棄すると消えてしまいます。データだけはコンテナが消えても保存しておきたかったり、別コンテナで使いたいというニーズに対して、Docker はコンテナ外にデータ保存領域をつくる機能を提供しています。 Ref from:https://qiita.com/aki_55p/items/63c47214cab7bcb027e0
 
+ここもまとまってるぽい　
+https://zenn.dev/fdnsy/articles/e2024d73ec2bda
+
+
 具体的には3種類。（厳密にいうと、Windows で名前付きパイプっていうのもある）
 - ボリューム
   - Docker の管理下でストレージ領域を確保する。Linux なら `/var/lib/docker/volumes/`以下。
